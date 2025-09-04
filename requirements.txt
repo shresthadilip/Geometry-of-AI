@@ -1,0 +1,10 @@
+numpy
+matplotlib
+geopandas
+shapely
+scikit-learn
+
+torch
+opencv-python
+tqdm
+ipywidgets
