@@ -1,12 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from dataset_factory import generate_non_linearly_separable_data
 
-# --- Dataset: XOR pattern ---
-np.random.seed(1)
+# --- Dataset: Three clusters (not linearly separable) ---
 N = 100
-X = np.random.randn(N, 2)
-y = (X[:, 0] * X[:, 1] > 0).astype(int).reshape(-1, 1)  # XOR labels
+X, y, X_class0, X_class1 = generate_non_linearly_separable_data(N=N, seed=0)
 X_bias = np.hstack([X, np.ones((X.shape[0], 1))])
 
 # --- Activation ---
@@ -39,10 +38,10 @@ for epoch in range(epochs):
     
     # Backprop
     error2 = y_hat - y
-    grad_W2 = np.hstack([a1, np.ones((a1.shape[0], 1))]).T @ error2 / N
+    grad_W2 = np.hstack([a1, np.ones((a1.shape[0], 1))]).T @ error2 / X.shape[0]
     
     error1 = (error2 @ W2[:-1].T) * a1 * (1 - a1)
-    grad_W1 = X_bias.T @ error1 / N
+    grad_W1 = X_bias.T @ error1 / X.shape[0]
     
     W1 -= lr * grad_W1
     W2 -= lr * grad_W2
@@ -54,7 +53,11 @@ for epoch in range(epochs):
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 
 # Left: dataset + neuron boundaries
-scatter = ax1.scatter(X[:, 0], X[:, 1], c=y.ravel(), cmap="bwr", alpha=0.7)
+ax1.scatter(X_class0[:, 0], X_class0[:, 1], color="red", label="Class 0", alpha=0.7)
+ax1.scatter(X_class1[:, 0], X_class1[:, 1], color="blue", label="Class 1", alpha=0.7)
+ax1.set_xlim(X[:, 0].min() - 1, X[:, 0].max() + 1)
+ax1.set_ylim(X[:, 1].min() - 1, X[:, 1].max() + 1)
+
 line1, = ax1.plot([], [], 'g--', label="Neuron 1")
 line2, = ax1.plot([], [], 'm--', label="Neuron 2")
 ax1.legend()

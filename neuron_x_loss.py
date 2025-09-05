@@ -1,50 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-
-# -------------------
-# Function 1: Shifted Gaussian clusters
-# -------------------
-def generate_shifted_clusters(N=200, shift0=-1, shift1=1, seed=42):
-    """
-    Generates two Gaussian clusters: Class 0 shifted by shift0, Class 1 shifted by shift1
-    Returns X (points) and y (labels)
-    """
-    np.random.seed(seed)
-    X_class0 = np.random.randn(N, 2) + shift0
-    X_class1 = np.random.randn(N, 2) + shift1
-    X = np.vstack([X_class0, X_class1])
-    y = np.hstack([np.zeros(N), np.ones(N)]).reshape(-1, 1)
-    return X, y
-
-# -------------------
-# Function 2: Circular dataset
-# -------------------
-def generate_circular_dataset(N=500, center=(7,7), radius=4, seed=42):
-    """
-    Generates dataset with points inside and outside a circle.
-    Class 0 = inside radius, Class 1 = outside radius
-    Returns X (points) and y (labels)
-    """
-    np.random.seed(seed)
-    X = np.random.uniform(0, 14, (N, 2))
-    y = (np.linalg.norm(X - np.array(center), axis=1) > radius).astype(int).reshape(-1, 1)
-    return X, y
-
-
+from dataset_factory import (
+    generate_linearly_separable_data,
+    generate_non_linearly_separable_data,
+    generate_circular_dataset
+)
 
 # -------------------
 # Dataset
 # -------------------
-np.random.seed(42)
-N = 200
-
-# Shifted Gaussian clusters
-X, y = generate_shifted_clusters(N=200)
-
-# Circular dataset
-# X, y = generate_circular_dataset(N=500, center=(7,7), radius=4)
-
+N = 100
+# Using the non-linear dataset as it's a good test for multi-neuron networks
+X, y, X_class0, X_class1 = generate_non_linearly_separable_data(N=N, seed=0)
 
 X_bias = np.hstack([X, np.ones((X.shape[0], 1))])
 
@@ -78,9 +46,9 @@ def train_and_visualize(neurons, epochs=60, lr=0.1):
 
         # Backprop
         error2 = y_hat - y
-        grad_W2 = np.hstack([a1, np.ones((a1.shape[0],1))]).T @ error2 / (2*N)
+        grad_W2 = np.hstack([a1, np.ones((a1.shape[0],1))]).T @ error2 / X.shape[0]
         error1 = (error2 @ W2[:-1].T) * a1 * (1-a1)
-        grad_W1 = X_bias.T @ error1 / (2*N)
+        grad_W1 = X_bias.T @ error1 / X.shape[0]
 
         W1 -= lr * grad_W1
         W2 -= lr * grad_W2
@@ -90,11 +58,12 @@ def train_and_visualize(neurons, epochs=60, lr=0.1):
 
     # --- Setup plots ---
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,5))
-    ax1.scatter(X[:, 0], X[:, 1], c=y.ravel(), cmap="bwr")
+    ax1.scatter(X_class0[:, 0], X_class0[:, 1], color="red", label="Class 0")
+    ax1.scatter(X_class1[:, 0], X_class1[:, 1], color="blue", label="Class 1")
     ax1.set_xlim(X[:,0].min()-1, X[:,0].max()+1)
     ax1.set_ylim(X[:,1].min()-1, X[:,1].max()+1)
     ax1.set_title(f"{neurons} Hidden Neurons")
-    ax1.legend()
+    ax1.legend(loc='upper left')
     neuron_lines = []
 
     ax2.set_xlim(0, epochs)
@@ -131,5 +100,5 @@ def train_and_visualize(neurons, epochs=60, lr=0.1):
 # -------------------
 # Run sequentially for 3, 4, 5 neurons
 # -------------------
-for n in [1,2,3,4,5]:
-    train_and_visualize(neurons=n, epochs=500)
+for n in [1, 2, 3, 5, 8]:
+    train_and_visualize(neurons=n, epochs=100)

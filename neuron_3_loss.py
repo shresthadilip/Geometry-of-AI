@@ -1,16 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from dataset_factory import generate_non_linearly_separable_data
 
 # -------------------
 # Dataset
 # -------------------
-np.random.seed(42)
-N = 200
-X_class0 = np.random.randn(N, 2) - 1  # shift left/down
-X_class1 = np.random.randn(N, 2) + 1  # shift right/up
-X = np.vstack([X_class0, X_class1])
-y = np.hstack([np.zeros(N), np.ones(N)]).reshape(-1, 1)
+N = 100
+X, y, X_class0, X_class1 = generate_non_linearly_separable_data(N=N, seed=0)
 
 # Add bias
 X_bias = np.hstack([X, np.ones((X.shape[0], 1))])
@@ -49,9 +46,9 @@ for epoch in range(epochs):
 
     # Backprop
     error2 = y_hat - y
-    grad_W2 = np.hstack([a1, np.ones((a1.shape[0],1))]).T @ error2 / (2*N)
+    grad_W2 = np.hstack([a1, np.ones((a1.shape[0],1))]).T @ error2 / X.shape[0]
     error1 = (error2 @ W2[:-1].T) * a1 * (1 - a1)
-    grad_W1 = X_bias.T @ error1 / (2*N)
+    grad_W1 = X_bias.T @ error1 / X.shape[0]
 
     W1 -= lr * grad_W1
     W2 -= lr * grad_W2

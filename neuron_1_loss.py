@@ -1,14 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from dataset_factory import generate_linearly_separable_data
 
 # --- Generate toy dataset ---
-np.random.seed(0)
 N = 100
-X_class0 = np.random.randn(N, 2) - 2
-X_class1 = np.random.randn(N, 2) + 2
-X = np.vstack([X_class0, X_class1])
-y = np.hstack([np.zeros(N), np.ones(N)]).reshape(-1, 1)
+X, y, X_class0, X_class1 = generate_linearly_separable_data(N=N, seed=0)
 
 # Add bias
 X_bias = np.hstack([X, np.ones((X.shape[0], 1))])
@@ -28,7 +25,7 @@ def compute_loss(y, y_hat):
 # --- Training ---
 w = np.random.randn(3, 1)
 lr = 0.1
-epochs = 50
+epochs = 100
 weights_history, losses = [], []
 
 for epoch in range(epochs):

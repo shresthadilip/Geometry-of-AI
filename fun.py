@@ -70,4 +70,11 @@ def update(frame):
     return scat,
 
 ani = FuncAnimation(fig, update, frames=200, interval=50, blit=True)
-plt.show()
+
+# To save the animation as a GIF, you might need to install Pillow:
+# pip install Pillow
+output_filename = 'fun_animation.gif'
+print(f"Saving animation to {output_filename}...")
+# The interval is 50ms, so 1000/50 = 20 fps.
+ani.save(output_filename, writer='pillow', fps=20)
+print("Done saving GIF.")

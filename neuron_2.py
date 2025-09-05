@@ -1,12 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from dataset_factory import generate_non_linearly_separable_data
 
-# 1. Toy dataset: XOR pattern (not linearly separable)
-np.random.seed(1)
+# 1. Toy dataset: Three clusters (not linearly separable)
 N = 100
-X = np.random.randn(N, 2)
-y = (X[:, 0] * X[:, 1] > 0).astype(int).reshape(-1, 1)  # XOR-like labels
+X, y, X_class0, X_class1 = generate_non_linearly_separable_data(N=N, seed=0)
 
 # Add bias term
 X_bias = np.hstack([X, np.ones((X.shape[0], 1))])
@@ -28,7 +27,14 @@ def compute_loss(y, y_hat):
     return -np.mean(y * np.log(y_hat + 1e-8) + (1 - y) * np.log(1 - y_hat + 1e-8))
 
 # Initialize weights
-W1 = np.random.randn(3, 2) * 0.5  # input->hidden (2 neurons)
+# We manually set the initial weights for W1 to create a more visually
+# interesting starting point for the animation.
+# Neuron 1 starts as a horizontal line, Neuron 2 as a vertical line.
+W1 = np.array([
+    [0.0, 1.0],  # weights for x1
+    [1.0, 0.0],  # weights for x2
+    [-3.0, -3.0] # bias weights
+], dtype=float)
 W2 = np.random.randn(3, 1) * 0.5  # hidden->output
 
 lr = 0.1
@@ -42,10 +48,10 @@ for epoch in range(epochs):
 
     # Backpropagation
     error2 = y_hat - y
-    grad_W2 = np.hstack([a1, np.ones((a1.shape[0], 1))]).T @ error2 / N
+    grad_W2 = np.hstack([a1, np.ones((a1.shape[0], 1))]).T @ error2 / X.shape[0]
 
     error1 = (error2 @ W2[:-1].T) * a1 * (1 - a1)
-    grad_W1 = X_bias.T @ error1 / N
+    grad_W1 = X_bias.T @ error1 / X.shape[0]
 
     # Update weights
     W1 -= lr * grad_W1
@@ -56,7 +62,12 @@ for epoch in range(epochs):
 
 # --- Visualization ---
 fig, ax = plt.subplots()
-scatter = ax.scatter(X[:, 0], X[:, 1], c=y.ravel(), cmap="bwr", alpha=0.7)
+ax.scatter(X_class0[:, 0], X_class0[:, 1], color="red", label="Class 0", alpha=0.7)
+ax.scatter(X_class1[:, 0], X_class1[:, 1], color="blue", label="Class 1", alpha=0.7)
+
+ax.set_xlim(X[:, 0].min() - 1, X[:, 0].max() + 1)
+ax.set_ylim(X[:, 1].min() - 1, X[:, 1].max() + 1)
+
 line1, = ax.plot([], [], 'g--', label="Neuron 1")
 line2, = ax.plot([], [], 'm--', label="Neuron 2")
 ax.legend()
@@ -73,8 +84,17 @@ def update(frame):
 
     line1.set_data(x_vals, y1_vals)
     line2.set_data(x_vals, y2_vals)
-    ax.set_title(f"Epoch {frame+1}")
+    ax.set_title(f"Epoch {frame}")
     return line1, line2
 
 ani = FuncAnimation(fig, update, frames=len(history), interval=300, repeat=False)
-plt.show()
+
+# plt.show()
+
+# To save the animation as a GIF, you might need to install Pillow:
+# pip install Pillow
+output_filename = 'neuron_2_animation.gif'
+print(f"Saving animation to {output_filename}...")
+ani.save(output_filename, writer='pillow', fps=5)
+print("Done saving GIF.")
+# plt.show() # You can uncomment this if you want to see the plot after saving
