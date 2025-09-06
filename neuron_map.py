@@ -90,33 +90,26 @@ def load_and_process_map(map_path, color_a, color_b, threshold_a, threshold_b, i
     return X_tensor, y_tensor, X_sample, y_sample, height, width
 
 class BaarleNet(nn.Module):
-    def __init__(self, hidden_layers=[64]):
+    def __init__(self, hidden_layers=[64], activation='relu'):
         super(BaarleNet, self).__init__()
-        layers = [nn.Linear(2, hidden_layers[0]), nn.ReLU()]
+        
+        if activation == 'relu':
+            act_fn = nn.ReLU()
+        elif activation == 'leaky_relu':
+            act_fn = nn.LeakyReLU()
+        else:
+            raise ValueError(f"Unsupported activation: {activation}")
+
+        layers = [nn.Linear(2, hidden_layers[0]), act_fn]
         for i in range(len(hidden_layers)-1):
             layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
-            layers.append(nn.ReLU())
+            layers.append(act_fn)
         layers.append(nn.Linear(hidden_layers[-1], 2))
-        self.layers=layers
         self.model = nn.Sequential(*layers)
     
     def forward(self, x):
         return self.model(x)
 
-class BaarleNetLeaky(nn.Module):
-    def __init__(self, hidden_layers=[64]):
-        super(BaarleNetLeaky, self).__init__()
-        layers = [nn.Linear(2, hidden_layers[0]), nn.LeakyReLU()]
-        for i in range(len(hidden_layers)-1):
-            layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
-            layers.append(nn.LeakyReLU())
-        layers.append(nn.Linear(hidden_layers[-1], 2))
-        self.layers=layers
-        self.model = nn.Sequential(*layers)
-    
-    def forward(self, x):
-        return self.model(x)
-    
 def train_model(model, X_train, y_train, X_val, y_val, num_epochs=5, batch_size=10000, learning_rate=0.005, device='cpu'):
     """
     Trains a PyTorch model and prints progress.
@@ -235,7 +228,7 @@ if __name__ == "__main__":
     torch.manual_seed(random_seed)
 
     # Initialize and train the model
-    layers = [100]
+    layers = [36,32,32]
     model = BaarleNet(layers).to(device)
     model = train_model(model, X_tensor, y_tensor, X_sample, y_sample,
                         num_epochs=num_epochs, batch_size=batch_size,
