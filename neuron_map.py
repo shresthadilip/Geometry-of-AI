@@ -4,15 +4,15 @@ import torch
 import matplotlib.pyplot as plt
 import torch.optim as optim
 import cv2
-from matplotlib.gridspec import GridSpec
-from tqdm import tqdm
-import os
 from torch.utils.data import DataLoader, TensorDataset
 
-def denorm(p, size=960):
+def denorm(p, width, height):
+    """
+    Denormalizes coordinates from [-1, 1] range back to image pixel space.
+    """
     result = np.zeros_like(p)
-    result[..., 0] = (p[..., 0] + 1) * (size / 2)
-    result[..., 1] = size - ((p[..., 1] + 1) * (size / 2))
+    result[..., 0] = (p[..., 0] + 1) * (width / 2)   # Denormalize x
+    result[..., 1] = height - ((p[..., 1] + 1) * (height / 2)) # Denormalize and flip y
     return result
 
 def load_and_process_map(map_path, color_a, color_b, threshold_a, threshold_b, image_size=960, num_samples=10000, seed=55):
@@ -43,7 +43,7 @@ def load_and_process_map(map_path, color_a, color_b, threshold_a, threshold_b, i
     tuple
         (X_tensor, y_tensor, X_sample, y_sample)
     """
-    map_img = cv2.imread(map_path)[:, :, (2, 1, 0)]
+    map_img = cv2.imread(map_path)[:, :, ::-1] # More concise BGR -> RGB
     height, width, _ = map_img.shape
 
     region_a_mask = ((map_img - color_a)**2).sum(-1) < threshold_a
@@ -92,13 +92,17 @@ def load_and_process_map(map_path, color_a, color_b, threshold_a, threshold_b, i
 class BaarleNet(nn.Module):
     def __init__(self, hidden_layers=[64], activation='relu'):
         super(BaarleNet, self).__init__()
-        
-        if activation == 'relu':
-            act_fn = nn.ReLU()
-        elif activation == 'leaky_relu':
-            act_fn = nn.LeakyReLU()
-        else:
-            raise ValueError(f"Unsupported activation: {activation}")
+
+        activation_functions = {
+            'relu': nn.ReLU(),
+            'leaky_relu': nn.LeakyReLU(),
+            # e.g., 'tanh': nn.Tanh() could be added here
+        }
+
+        if activation not in activation_functions:
+            raise ValueError(f"Unsupported activation: {activation}. Supported are: {list(activation_functions.keys())}")
+
+        act_fn = activation_functions[activation]
 
         layers = [nn.Linear(2, hidden_layers[0]), act_fn]
         for i in range(len(hidden_layers)-1):
@@ -109,7 +113,7 @@ class BaarleNet(nn.Module):
     
     def forward(self, x):
         return self.model(x)
-
+    
 def train_model(model, X_train, y_train, X_val, y_val, num_epochs=5, batch_size=10000, learning_rate=0.005, device='cpu'):
     """
     Trains a PyTorch model and prints progress.
@@ -192,6 +196,43 @@ def viz_descision_boundary(model, height, width, map_path, device='cpu'):
     pred_map = torch.cat(all_preds).numpy().reshape(height, width)
     
     map_img=cv2.imread(map_path)[:,:,(2,1,0)]
+
+    # --- Plot the lines from the first hidden layer ---
+    with torch.no_grad():
+        # Get weights and biases from the first linear layer
+        first_layer_weights = model.model[0].weight.cpu().numpy() # Shape: (num_neurons, 2)
+        first_layer_biases = model.model[0].bias.cpu().numpy()   # Shape: (num_neurons,)
+
+        # Get weights from the output layer to determine neuron importance
+        output_layer_weights = model.model[-1].weight.cpu().numpy() # Shape: (2, num_neurons)
+        # Importance is how much a neuron's output affects the difference between class 1 and class 0
+        importance_scores = np.abs(output_layer_weights[1, :] - output_layer_weights[0, :])
+        # Set a threshold to highlight the top 25% most important neurons
+        importance_threshold = np.percentile(importance_scores, 75)
+
+        # Create x-values in the normalized [-1, 1] space
+        x_norm = np.linspace(-1, 1, 2)
+
+        for i in range(first_layer_weights.shape[0]):
+            w1, w2 = first_layer_weights[i, 0], first_layer_weights[i, 1]
+            b = first_layer_biases[i]
+
+            # Determine color based on importance
+            if importance_scores[i] >= importance_threshold:
+                color, alpha, lw = 'r-', 0.7, 1.5 # Red for important neurons
+            else:
+                color, alpha, lw = 'k--', 0.4, 1.0 # Black for less important neurons
+
+            # Equation of the line: w1*x + w2*y + b = 0
+            # We solve for y: y = -(w1*x + b) / w2
+            if abs(w2) > 1e-6: # Avoid division by zero for vertical-ish lines
+                y_norm = -(w1 * x_norm + b) / w2
+
+                # Denormalize the line coordinates to plot them in pixel space
+                line_points_norm = np.stack([x_norm, y_norm], axis=-1)
+                line_points_pixel = denorm(line_points_norm, width, height)
+                ax.plot(line_points_pixel[:, 0], line_points_pixel[:, 1], color, alpha=alpha, linewidth=lw)
+
     ax.imshow(map_img.mean(2), cmap='gray')
 
     ax.imshow(np.flipud(pred_map), extent=[0, width, height, 0], alpha=0.7, cmap='viridis')
@@ -206,7 +247,7 @@ if __name__ == "__main__":
     outside_nepal_color = np.array([255, 255, 255])
     outside_nepal_threshold = 50
     nepal_threshold = 10000
-    map_path = 'nepal-map.png'
+    map_path = 'circle.png'
 
     X_tensor, y_tensor, X_sample, y_sample, height, width = load_and_process_map(
         map_path,
@@ -219,7 +260,7 @@ if __name__ == "__main__":
 
     # --- Model Training ---
     # Hyperparameters
-    num_epochs = 5
+    num_epochs = 10
     random_seed = 25
     device = 'cpu'
     batch_size = 10000
@@ -228,7 +269,7 @@ if __name__ == "__main__":
     torch.manual_seed(random_seed)
 
     # Initialize and train the model
-    layers = [36,32,32]
+    layers = [32]
     model = BaarleNet(layers).to(device)
     model = train_model(model, X_tensor, y_tensor, X_sample, y_sample,
                         num_epochs=num_epochs, batch_size=batch_size,
